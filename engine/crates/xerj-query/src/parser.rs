@@ -2515,10 +2515,24 @@ fn parse_simple_query_string(params: &Value) -> Result<QueryNode> {
     // #1284: same default as `multi_match` / `query_string`.
     let lenient = parse_lenient(obj.get("lenient")).unwrap_or_else(|| targets_every_field(&fields));
 
-    // Tokenize the query: split on whitespace; leading +/-/| signal per-term operators.
+    // Tokenize the query: split on whitespace. `+`, `-` and `|` are operators
+    // whether they are glued to a term (`+fox`) or stand alone (`fox + lazy`):
+    // Lucene's SimpleQueryParser scans characters, so spacing never changes the
+    // meaning. `+` and `|` also reach back to the clause before them — `+`
+    // requires it, `|` makes it optional — which is why `fox + lazy` under the
+    // default `or` needs both words (#1751).
+    #[derive(Clone, Copy)]
+    enum Occur {
+        Must,
+        Should,
+    }
     let mut must: Vec<QueryNode> = Vec::new();
     let mut should: Vec<QueryNode> = Vec::new();
     let mut must_not: Vec<QueryNode> = Vec::new();
+    // Where the last positive clause went, so a following `+`/`|` can move it.
+    let mut last: Option<Occur> = None;
+    // A bare operator token seen on its own, applied to the term after it.
+    let mut pending: Option<char> = None;
 
     for tok in query.split_whitespace() {
         // Detect a leading per-term sign.
@@ -2532,19 +2546,57 @@ fn parse_simple_query_string(params: &Value) -> Result<QueryNode> {
             (' ', tok)
         };
         if term_text.is_empty() {
+            // A bare operator applies to the term that follows it, not to itself.
+            if sign != ' ' {
+                pending = Some(sign);
+            }
             continue;
+        }
+        // An attached sign wins; otherwise the bare operator seen before applies.
+        let sign = if sign == ' ' {
+            pending.take().unwrap_or(' ')
+        } else {
+            pending = None;
+            sign
+        };
+        // `+`/`|` also join backwards: `+` requires the clause before them, `|`
+        // frees it. A `-` leaves the previous clause alone — the next operator
+        // then has no positive neighbour to retarget.
+        match (sign, last) {
+            ('+', Some(Occur::Should)) => {
+                if let Some(prev) = should.pop() {
+                    must.push(prev);
+                }
+            }
+            ('|', Some(Occur::Must)) => {
+                if let Some(prev) = must.pop() {
+                    should.push(prev);
+                }
+            }
+            _ => {}
         }
         let node = make_simple_query_node(term_text, &fields, lenient);
         match sign {
-            '+' => must.push(node),
-            '-' => must_not.push(node),
-            '|' => should.push(node),
+            '+' => {
+                must.push(node);
+                last = Some(Occur::Must);
+            }
+            '-' => {
+                must_not.push(node);
+                last = None;
+            }
+            '|' => {
+                should.push(node);
+                last = Some(Occur::Should);
+            }
             _ => {
                 // Unsigned token: dispatched per default_operator.
                 if default_operator == "and" {
                     must.push(node);
+                    last = Some(Occur::Must);
                 } else {
                     should.push(node);
+                    last = Some(Occur::Should);
                 }
             }
         }
@@ -5664,6 +5716,82 @@ mod tests {
 
     fn strs(v: &[&str]) -> Vec<String> {
         v.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// #1751: `+` and `|` are operators even when written as their own token.
+    ///
+    /// Lucene's SimpleQueryParser scans characters, so `fox + lazy` and
+    /// `fox +lazy` mean the same thing. The whitespace split read a bare
+    /// operator as an empty term and dropped it, leaving every term on
+    /// `default_operator` — so `fox | bear` under `and` needed both words and
+    /// `fox + lazy` under the default `or` needed either.
+    #[test]
+    fn simple_query_string_bare_operators_bind_their_neighbours() {
+        fn sqs_occurs(
+            query: &str,
+            default_operator: Option<&str>,
+        ) -> (
+            Vec<String>,
+            Vec<String>,
+            Vec<String>,
+            Option<MinShouldMatch>,
+        ) {
+            let mut body = json!({ "query": query, "fields": ["t"] });
+            if let Some(op) = default_operator {
+                body["default_operator"] = json!(op);
+            }
+            match q(json!({ "simple_query_string": body })) {
+                QueryNode::Bool {
+                    must,
+                    should,
+                    must_not,
+                    minimum_should_match,
+                    ..
+                } => {
+                    let own =
+                        |v: &[QueryNode]| match_terms(v).into_iter().map(String::from).collect();
+                    (
+                        own(&must),
+                        own(&should),
+                        own(&must_not),
+                        minimum_should_match,
+                    )
+                }
+                other => panic!("{query}: expected a Bool, got {other:?}"),
+            }
+        }
+
+        // `|` is OR whatever `default_operator` says.
+        for query in ["fox | bear", "fox |bear"] {
+            assert_eq!(
+                sqs_occurs(query, Some("and")),
+                (
+                    vec![],
+                    strs(&["fox", "bear"]),
+                    vec![],
+                    Some(MinShouldMatch::Fixed(1))
+                ),
+                "{query}"
+            );
+        }
+        // `+` is AND whatever `default_operator` says.
+        for query in ["fox + lazy", "fox +lazy"] {
+            assert_eq!(
+                sqs_occurs(query, None),
+                (strs(&["fox", "lazy"]), vec![], vec![], None),
+                "{query}"
+            );
+        }
+        // A trailing operator has no term left to bind, so it changes nothing.
+        assert_eq!(
+            sqs_occurs("fox +", None),
+            (
+                vec![],
+                strs(&["fox"]),
+                vec![],
+                Some(MinShouldMatch::Fixed(1))
+            )
+        );
     }
 
     /// #1299: a prohibited clause excludes from its whole level. `alpha

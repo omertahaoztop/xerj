@@ -1,0 +1,52 @@
+---
+"simple_query_string: a bare `|` is OR and a bare `+` is AND (#1751)":
+  - do:
+      indices.create:
+          index: test_index
+          body:
+              mappings:
+                  properties:
+                      title:
+                          type: text
+  - do:
+      bulk:
+          refresh: true
+          body:
+              - '{"index": {"_index": "test_index", "_id": "1"}}'
+              - '{"title": "quick brown fox"}'
+              - '{"index": {"_index": "test_index", "_id": "2"}}'
+              - '{"title": "lazy dog sleeps"}'
+              - '{"index": {"_index": "test_index", "_id": "3"}}'
+              - '{"title": "brown bear"}'
+
+  # `|` is OR whatever `default_operator` says: ES 8.13.4 returns 2 (docs 1, 3).
+  - do:
+      search:
+          rest_total_hits_as_int: true
+          index: test_index
+          body: {"query": {"simple_query_string": {"query": "fox | bear", "fields": ["title"], "default_operator": "and"}}}
+  - match: { hits.total: 2 }
+
+  # `+` is AND whatever `default_operator` says: no document carries both
+  # words, so ES 8.13.4 returns 0.
+  - do:
+      search:
+          rest_total_hits_as_int: true
+          index: test_index
+          body: {"query": {"simple_query_string": {"query": "fox + lazy", "fields": ["title"]}}}
+  - match: { hits.total: 0 }
+
+  # Spacing never changes the operator: `fox |bear` and `fox +lazy` are the
+  # same two queries.
+  - do:
+      search:
+          rest_total_hits_as_int: true
+          index: test_index
+          body: {"query": {"simple_query_string": {"query": "fox |bear", "fields": ["title"], "default_operator": "and"}}}
+  - match: { hits.total: 2 }
+  - do:
+      search:
+          rest_total_hits_as_int: true
+          index: test_index
+          body: {"query": {"simple_query_string": {"query": "fox +lazy", "fields": ["title"]}}}
+  - match: { hits.total: 0 }
