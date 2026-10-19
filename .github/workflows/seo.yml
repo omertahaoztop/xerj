@@ -66,6 +66,11 @@ jobs:
       - name: Date-source unit tests (full, shallow, untracked, no repo)
         run: python3 scripts/seo/test_urlmap.py
 
+      # Git resolves paths from the repository root, so the audit has to hand it
+      # one; a landing-relative path matched nothing and silenced <lastmod>.
+      - name: Audit date unit tests
+        run: python3 scripts/seo/test_audit_dates.py
+
       # The field report has its own section, ahead of Optional, and the
       # homepage prompt asks before sending.
       - name: Field-report section and permission line
@@ -74,7 +79,12 @@ jobs:
       - name: generated articles are current
         run: python3 scripts/seo/build_articles.py --check
 
-      - name: sitemap.xml is generated, not hand-edited
+      # sitemap.xml is a deploy artifact: `Deploy site (Cloudflare Pages)` runs
+      # `gen_sitemap.py --write` on a full checkout before uploading landing/,
+      # and no copy is committed. The tools that inspect it (`seo_lint.py`,
+      # `audit.py`, `verify_live.py`) build it from the tree when the file is
+      # absent, so this step is the gate on the derivation itself.
+      - name: sitemap derivation is valid
         run: python3 scripts/seo/gen_sitemap.py --check
 
       - name: every <head> matches the generator

@@ -178,9 +178,9 @@ def _canonical_of(body: bytes) -> str | None:
     return h.group(1).strip() if h else None
 
 
-def sitemap_urls(sitemap: pathlib.Path) -> list[str]:
-    """Every `<loc>` in the committed sitemap, in document order."""
-    root = ET.parse(sitemap).getroot()
+def sitemap_urls(text: str) -> list[str]:
+    """Every `<loc>` in a sitemap document, in document order."""
+    root = ET.fromstring(text)
     out = []
     for u in root.findall(f"{SITEMAP_NS}url"):
         loc = (u.findtext(f"{SITEMAP_NS}loc") or "").strip()
@@ -259,11 +259,20 @@ def main(argv: list[str] | None = None) -> int:
 
     sitemap = (pathlib.Path(args.sitemap) if args.sitemap
                else urlmap.landing_dir() / "sitemap.xml")
-    if not sitemap.is_file():
+    if sitemap.is_file():
+        text = sitemap.read_text(encoding="utf-8", errors="replace")
+    elif args.sitemap:
         print(f"verify_live: no sitemap at {sitemap}", file=sys.stderr)
         return 2
+    else:
+        # landing/sitemap.xml is a deploy artifact and is not committed, so
+        # fall back to the document the deploy would have shipped from this
+        # tree — the question is still "did this tree reach production".
+        import gen_sitemap
+
+        text = gen_sitemap.sitemap_for(urlmap.landing_dir())
     try:
-        locs = sitemap_urls(sitemap)
+        locs = sitemap_urls(text)
     except ET.ParseError as e:
         print(f"verify_live: {sitemap} does not parse: {e}", file=sys.stderr)
         return 2
