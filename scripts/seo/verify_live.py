@@ -48,10 +48,11 @@ Plus one probe that needs no sitemap: a path that has never existed must
 answer **404**, not 200.  That single request is the fastest way to tell
 whether the not-found handling is still correct after any deploy.
 
-The sitemap comes from the **committed** `landing/sitemap.xml`, never from
-`<base>/sitemap.xml`.  The question being asked is "did what we committed
-actually reach production", and reading the deployed sitemap would let a
-stale or truncated deploy answer for itself.
+The sitemap comes from this tree — a local `landing/sitemap.xml` if one is
+there, otherwise the document `gen_sitemap.py` derives from the tree — never
+from `<base>/sitemap.xml`.  The question being asked is "did what this tree
+says should be live actually reach production", and reading the deployed
+sitemap would let a stale or truncated deploy answer for itself.
 
 Usage
 -----
@@ -244,7 +245,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("base", nargs="?", default=urlmap.SITE_ORIGIN,
                     help=f"origin to test (default {urlmap.SITE_ORIGIN})")
     ap.add_argument("--sitemap", default=None,
-                    help="committed sitemap (default landing/sitemap.xml)")
+                    help="sitemap file to read (default landing/sitemap.xml, "
+                         "else generated from the tree)")
     ap.add_argument("--jobs", type=int, default=8, help="parallel requests (default 8)")
     ap.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
     ap.add_argument("--limit", type=int, default=0, help="test only the first N URLs")
