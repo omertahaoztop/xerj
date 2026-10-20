@@ -86,6 +86,11 @@ pub const EXIT_NEEDS_DECISION: i32 = 4;
 /// A pull was refused because this build has no hub public key: not a pack that
 /// failed verification ([`EXIT_UNVERIFIED`]) but one that cannot be judged at all.
 pub const EXIT_NO_KEY: i32 = 5;
+/// The hub catalogue could not be loaded (the hub is unreachable, serves no signed
+/// catalogue, or `--offline` has no cached one). Not [`EXIT_NO_ANSWER`]: that one
+/// says "the hub has nothing for this question", which an agent reads as an answer
+/// about the corpus, while this one is about the hub itself and is worth a retry.
+pub const EXIT_HUB_UNAVAILABLE: i32 = 6;
 
 /// Printed (stderr) when the router finds nothing credible.
 pub const NO_CORPUS_MESSAGE: &str = "no hub corpus matches; see xerj.org/llms.txt";
@@ -606,12 +611,13 @@ pub fn ask(args: &AskArgs, deps: &AskDeps<'_>) -> AskOutcome {
     };
     // The pull policy is decided FIRST, before anything about how this run was asked
     // to behave. Whether a pack may be pulled at all does not depend on `--offline`
-    // or `--no-fetch`; and what is printed below must never be a command that
-    // `xerj hub pull` refuses — or, for an excluded licence class, a way round
-    // "never pulled". (The offline branch used to run before the policy and print
-    // `run: xerj hub pull <slug>` for an excluded corpus; `hub pull` itself had no
-    // licence check, so an agent that followed the hint pulled it.) An excluded
-    // corpus and an oversize pack get a plain no.
+    // or `--no-fetch`. An EXCLUDED corpus is never pulled, so no command is printed
+    // for it — a `run: xerj hub pull <slug>` would be a way round "never pulled"
+    // (the offline branch used to run before the policy and print exactly that; the
+    // pull had no licence check, so an agent that followed the hint pulled it). An
+    // OVERSIZE pack is different: a question does not drag it down automatically,
+    // but `xerj hub pull <slug>` fetches it explicitly, so its message names that
+    // command — the same hint an allowed pack gets.
     match pull_policy(entry) {
         PullPolicy::Excluded => {
             out.stderr.push(format!(
@@ -624,8 +630,9 @@ pub fn ask(args: &AskArgs, deps: &AskDeps<'_>) -> AskOutcome {
         }
         PullPolicy::TooLarge => {
             out.stderr.push(format!(
-                "'{shown}' is {} MB, over the {} MB limit for pulling a pack, so it is not \
-                 downloaded; no hosted answer is available",
+                "'{shown}' is {} MB, over the {} MB auto-pull cap, so a question does not \
+                 download it automatically and no hosted answer is available; run \
+                 `xerj hub pull {shown}` to fetch it once, then ask again",
                 megabytes(entry.pack_bytes),
                 megabytes(AUTO_PULL_MAX_BYTES)
             ));
@@ -914,12 +921,14 @@ fn finish_hosted(
                     }
                 }
             }
-            // No command to run for these: `xerj hub pull` refuses both.
+            // An oversize pack is not auto-pulled, but `xerj hub pull` fetches it
+            // explicitly, so the note names that command; an excluded one it refuses.
             PullPolicy::TooLarge => notes.push(format!(
-                "the pack is {} MB, over the {} MB limit for pulling a pack: this answer is \
-                 from the hosted hub only",
+                "the pack is {} MB, over the {} MB auto-pull cap, so this answer is from the \
+                 hosted hub; run `xerj hub pull {}` to fetch it for local answers",
                 megabytes(e.pack_bytes),
-                megabytes(AUTO_PULL_MAX_BYTES)
+                megabytes(AUTO_PULL_MAX_BYTES),
+                printable(&e.slug)
             )),
             PullPolicy::Excluded => notes.push(format!(
                 "excluded licence ({}): this corpus is never pulled",
@@ -1502,8 +1511,11 @@ impl Backend for RealBackend {
         // Everything that can refuse this pull — the licence policy, the size cap, a
         // malformed slug or pin, no key to verify with — is decided BEFORE a node is
         // started for it. A pull that is going to be refused must not first boot a
-        // whole node.
-        let plan = cli::plan_pull_entry(entry).map_err(|e| PullFailure {
+        // whole node. This is the AUTOMATIC path (a question triggered it), so the
+        // ceiling is the 50 MiB auto-pull cap, not the disk budget an explicit
+        // `xerj hub pull` uses: `pull_policy` already kept a larger pack off this
+        // path, and the cap here is the backstop that keeps it off.
+        let plan = cli::plan_pull_entry(entry, AUTO_PULL_MAX_BYTES).map_err(|e| PullFailure {
             code: e.code,
             message: format!("pull of '{}' failed: {}", printable(&entry.slug), e.message),
         })?;
@@ -1616,8 +1628,13 @@ pub fn run_ask_with(
             Ok(c) => c,
             Err(e) => {
                 return AskOutcome::fail(
-                    EXIT_NO_ANSWER,
-                    format!("cannot load the hub catalogue: {e:#}"),
+                    EXIT_HUB_UNAVAILABLE,
+                    format!(
+                        "cannot load the hub catalogue: {e:#}\n\
+                         (exit {EXIT_HUB_UNAVAILABLE}: the hub itself is unavailable; this says nothing about \
+                         whether a corpus holds the answer. Retry later, point XERJ_HUB_URL at a working hub, \
+                         or ask with --offline once a catalogue is cached.)"
+                    ),
                 )
             }
         }
@@ -2320,7 +2337,7 @@ mod tests {
     }
 
     #[test]
-    fn a_pack_over_the_limit_is_not_pulled_and_the_message_names_its_size() {
+    fn a_pack_over_the_limit_is_not_auto_pulled_but_the_note_names_the_explicit_pull() {
         let rig = Rig::new();
         let sixty_mib = 60 * 1024 * 1024;
         let cat = catalogue(vec![lz4(sixty_mib, LicenceClass::AdaptWithAttribution)]);
@@ -2332,21 +2349,21 @@ mod tests {
             &backend,
         );
         assert_eq!(out.exit, EXIT_OK);
+        // A question still does not AUTO-pull an oversize pack ...
         assert!(!backend.called("pull_"), "{:?}", backend.calls());
-        // The note names the size, and is in the structured answer too ...
+        // ... the note names the size and says the answer is from the hosted hub ...
         assert!(out.stdout.contains("60.0 MB"), "{}", out.stdout);
         let ans = out.answer.unwrap();
         assert!(
             ans.warnings
                 .iter()
-                .any(|w| w.contains("60.0 MB") && w.contains("hosted hub only")),
+                .any(|w| w.contains("60.0 MB") && w.contains("hosted hub")),
             "{:?}",
             ans.warnings
         );
-        // ... but it is not a command: `xerj hub pull` refuses an oversize pack, so
-        // a `run:` line would send the reader to a command that fails.
-        assert!(!out.stdout.contains("xerj hub pull"), "{}", out.stdout);
-        assert!(!out.stdout.contains("run:"), "{}", out.stdout);
+        // ... and, now that an explicit pull fetches an oversize pack, it names
+        // `xerj hub pull` so the reader can get local answers.
+        assert!(out.stdout.contains("xerj hub pull lz4"), "{}", out.stdout);
     }
 
     #[test]
@@ -2502,7 +2519,8 @@ mod tests {
     #[test]
     fn the_policy_also_binds_the_synchronous_pull() {
         let rig = Rig::new();
-        // Over the limit: no pull, the message names the size and the command.
+        // Over the cap: no AUTOMATIC pull, but the message names the size and the
+        // explicit command that does fetch it.
         let cat = catalogue(vec![lz4(
             80 * 1024 * 1024,
             LicenceClass::AdaptWithAttribution,
@@ -2513,8 +2531,8 @@ mod tests {
         assert!(!backend.called("pull_now"), "{:?}", backend.calls());
         assert!(out.stderr[0].contains("80.0 MB"), "{:?}", out.stderr);
         assert!(
-            !out.stderr[0].contains("xerj hub pull") && !out.stderr[0].contains("run:"),
-            "no command for a pack `hub pull` refuses: {:?}",
+            out.stderr[0].contains("xerj hub pull lz4"),
+            "names the explicit pull for an over-cap pack: {:?}",
             out.stderr
         );
 
@@ -2584,7 +2602,10 @@ mod tests {
     }
 
     #[test]
-    fn offline_never_hints_a_pull_for_a_pack_over_the_limit() {
+    fn offline_names_the_explicit_pull_for_a_pack_over_the_cap() {
+        // An oversize pack is not auto-pulled, but `xerj hub pull` fetches it
+        // explicitly — so, like any pullable pack, the offline/no-fetch message
+        // names that command (it is the thing to run once back online).
         let rig = Rig::new();
         let cat = catalogue(vec![lz4(
             80 * 1024 * 1024,
@@ -2601,8 +2622,16 @@ mod tests {
             let out = rig.run(&a, &cat, None, &backend);
             assert_eq!(out.exit, EXIT_NO_ANSWER);
             assert!(out.stderr[0].contains("80.0 MB"), "{:?}", out.stderr);
-            no_pull_command(&out);
-            assert_eq!(backend.calls(), ["ready:lz4"]);
+            assert!(
+                out.stderr[0].contains("xerj hub pull lz4"),
+                "names the explicit pull: {:?}",
+                out.stderr
+            );
+            assert!(
+                !backend.called("pull_"),
+                "not auto-pulled: {:?}",
+                backend.calls()
+            );
         }
     }
 

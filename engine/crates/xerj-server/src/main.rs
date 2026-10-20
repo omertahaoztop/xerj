@@ -297,8 +297,8 @@ fn help_text(feedback: bool) -> String {
          \x20\x20\x20\x20xerj share <index|folder>           give someone read-only search over one\n\
          \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20index: link + passcode + expiry (see xerj\n\
          \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20share --help)\n\
-         \x20\x20\x20\x20xerj feedback [OPTIONS]             draft the agent field report (and open its\n\
-         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20PR) — see xerj feedback --help\n\
+         \x20\x20\x20\x20xerj feedback [OPTIONS]             draft or --submit the agent field report —\n\
+         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20see xerj feedback --help\n\
          \n\
          OPTIONS (for `xerj [OPTIONS]`, the bare server start):\n\
          \x20\x20\x20\x20--config,   -c <PATH>  Path to TOML config file. CORS is off by default (no\n\
@@ -330,8 +330,13 @@ fn help_text(feedback: bool) -> String {
          \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20onnx-experimental\n\
          \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20lexical  built-in feature-hash (default; offline, not neural)\n\
          \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20neural   built-in BERT (all-MiniLM-L6-v2) — real semantics,\n\
-         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20in-process; auto-downloads the model (~90 MB) on\n\
-         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20first use, then runs from cache. Just add the flag.\n\
+         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20in-process. The model (~90 MB) loads at startup:\n\
+         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20downloaded from the HuggingFace Hub, or read from\n\
+         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20embedding.local_model_dir, then cached. If that load\n\
+         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20fails, the process refuses to start. It does not keep\n\
+         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20running and fail every ingest, and it does not write\n\
+         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20lexical vectors. Restart with: xerj --embed-mode lexical\n\
+         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20Or set HF_ENDPOINT to a Hub mirror and start again.\n\
          \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20proxy    external OpenAI-compatible /v1/embeddings endpoint\n\
          \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20auto     proxy if embedding.default_endpoint is set, else lexical\n\
          \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20onnx-experimental  local all-MiniLM-L6-v2-compatible FP32\n\
@@ -414,8 +419,8 @@ fn help_text(feedback: bool) -> String {
          \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20Proxies to a node you already started — set XERJ_URL or\n\
          \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20--url (see xerj mcp --help)\n\
          \x20\x20\x20\x20xerj feedback   [opts]          draft the agent field report XERJ asks every agent to\n\
-         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20file, auto-filling version/OS/what-was-indexed; --open-pr\n\
-         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20files it, --dry-run just prints (see xerj feedback --help)\n\
+         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20file; --submit sends it (GitHub PR first, API fallback),\n\
+         \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20--dry-run just prints (see xerj feedback --help)\n\
          \n\
          SEARCHING A CODEBASE:\n\
          \x20\x20\x20\x20A search hit returns the whole indexed document, which for source code is the\n\
@@ -1316,32 +1321,64 @@ async fn serve(
 /// can never advertise a port another process owns — the failure mode that
 /// sent one user's contracts, invoices and bank export into a stranger's data
 /// directory under `ok=true exit=0` (issue #465).
-/// What a bare `xerj` prints when the default port is taken.
+/// The `[server]` config key that moves only this listener.
+fn listener_port_key(name: &str) -> &'static str {
+    match name {
+        "ES-compat" => "es_compat_port",
+        "native REST" => "rest_port",
+        "gRPC" => "grpc_port",
+        _ => "es_compat_port / rest_port / grpc_port",
+    }
+}
+
+/// What startup prints when a listener cannot be bound.
 ///
-/// The old context was `ES-compat: bind 127.0.0.1:9200` plus the OS error.
-/// A bare `xerj` starts the server. When that port is taken, the error did
-/// not mention `--port`, `--auto-port`, or that `--help` lists subcommands.
-fn addr_in_use_message(name: &str, addr: SocketAddr) -> String {
-    format!(
-        "{name}: {addr} is already in use. Pass --port <PORT> to pick a different one, or \
-         --auto-port to take the next free port. If you did not mean to start a server, \
-         `xerj --help` lists the subcommands."
-    )
+/// Always `{name}: bind {addr}: {OS error}` first — the listener, the address
+/// and the reason, which is what the #465 process test pins — then, for the
+/// two failures an operator fixes by moving the port, the flags that move it.
+///
+/// #1687 added a hint for `AddrInUse` only, and #1778 re-appended the OS
+/// reason after it. Two gaps remained. The hint told every listener to "pass
+/// --port <PORT> to pick a different one", but `--port` sets the ES-compat
+/// port and puts native REST on PORT+1 and gRPC on PORT+2, so for those two
+/// it read as if `--port` were their own port. And the Windows refusal from
+/// #1723 / #1738 (`os error 10013`, WSAEACCES — usually a port inside a
+/// Hyper-V/WinNAT excluded range) is `PermissionDenied`, not `AddrInUse`, so
+/// it still printed the bare `native REST: bind 127.0.0.1:8080` with no hint.
+fn bind_error_message(name: &str, addr: SocketAddr, err: &std::io::Error) -> String {
+    let key = listener_port_key(name);
+    let move_it = "--port <BASE> moves all three listeners together (ES-compat BASE, \
+         native REST BASE+1, gRPC BASE+2; e.g. --port 9300)";
+    let only_this =
+        format!("or set `{key}` under [server] in a --config file to move only this one");
+    let not_a_server =
+        "If you did not mean to start a server, `xerj --help` lists the subcommands.";
+    match err.kind() {
+        std::io::ErrorKind::AddrInUse => format!(
+            "{name}: bind {addr}: {err}. Another process is already listening there. \
+             {move_it}, --auto-port takes the next free ports, {only_this}. {not_a_server}"
+        ),
+        std::io::ErrorKind::PermissionDenied => {
+            // `--auto-port` only steps past ports that are in use, so it is
+            // not offered for a refused one.
+            let cause = if cfg!(windows) {
+                "Windows refused the port; it is often inside a range reserved by \
+                 Hyper-V or WinNAT (list them with \
+                 `netsh int ipv4 show excludedportrange protocol=tcp`)."
+            } else if addr.port() < 1024 {
+                "Ports below 1024 need elevated privileges."
+            } else {
+                "The operating system refused the port."
+            };
+            format!("{name}: bind {addr}: {err}. {cause} {move_it}, {only_this}. {not_a_server}")
+        }
+        _ => format!("{name}: bind {addr}: {err}"),
+    }
 }
 
 fn bind_listener(addr: SocketAddr, name: &str) -> Result<std::net::TcpListener> {
-    let listener = match std::net::TcpListener::bind(addr) {
-        Ok(listener) => listener,
-        Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-            // The hint first, then the OS reason and the `bind {addr}` wording
-            // the #465 process test (`taken_port_fails_startup`) relies on.
-            anyhow::bail!(
-                "{} ({name}: bind {addr}: {e})",
-                addr_in_use_message(name, addr)
-            );
-        }
-        Err(e) => return Err(e).with_context(|| format!("{name}: bind {addr}")),
-    };
+    let listener = std::net::TcpListener::bind(addr)
+        .map_err(|e| anyhow::anyhow!("{}", bind_error_message(name, addr, &e)))?;
     // Both axum's accept loop and axum-server's rustls acceptor drive this
     // listener from the reactor; a blocking fd would stall the runtime thread
     // on the first accept.
@@ -1353,7 +1390,9 @@ fn bind_listener(addr: SocketAddr, name: &str) -> Result<std::net::TcpListener> 
 
 #[cfg(test)]
 mod bind_listener_tests {
-    use super::{addr_in_use_message, bind_listener};
+    use super::{bind_error_message, bind_listener};
+    use std::io::{Error, ErrorKind};
+    use std::net::SocketAddr;
 
     #[test]
     fn a_taken_port_names_port_and_auto_port() {
@@ -1364,12 +1403,73 @@ mod bind_listener_tests {
         assert!(msg.contains("--port"), "{msg}");
         assert!(msg.contains("--auto-port"), "{msg}");
         assert!(msg.contains("xerj --help"), "{msg}");
-        assert!(msg.contains(&addr.to_string()), "{msg}");
+        // #465's contract: the listener, the address, and the OS reason.
+        assert!(msg.contains(&format!("ES-compat: bind {addr}: ")), "{msg}");
+        assert!(msg.contains("os error"), "the OS error is kept: {msg}");
+        assert!(msg.contains("`es_compat_port`"), "{msg}");
+    }
+
+    /// `--port` is the ES-compat port; the hint for the other two listeners
+    /// must say how it moves them and name the key that moves only them.
+    #[test]
+    fn each_listener_names_its_own_key_and_how_port_moves_it() {
+        let addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
+        let os = Error::from(ErrorKind::AddrInUse);
+        for (name, key) in [
+            ("ES-compat", "es_compat_port"),
+            ("native REST", "rest_port"),
+            ("gRPC", "grpc_port"),
+        ] {
+            let msg = bind_error_message(name, addr, &os);
+            assert!(msg.starts_with(&format!("{name}: bind {addr}: ")), "{msg}");
+            assert!(msg.contains(&format!("`{key}`")), "{msg}");
+            assert!(msg.contains("native REST BASE+1, gRPC BASE+2"), "{msg}");
+            assert!(msg.contains("--auto-port"), "{msg}");
+        }
+    }
+
+    /// #1723 / #1738: Windows' `os error 10013` is `PermissionDenied`, and it
+    /// printed no hint at all. `--auto-port` is not offered: it only steps
+    /// past ports that are in use.
+    #[test]
+    fn a_refused_port_gets_a_hint_without_auto_port() {
+        let os = Error::from(ErrorKind::PermissionDenied);
+        let high: SocketAddr = "127.0.0.1:8080".parse().unwrap();
+        let msg = bind_error_message("native REST", high, &os);
         assert!(
-            msg.starts_with(&addr_in_use_message("ES-compat", addr)),
+            msg.starts_with("native REST: bind 127.0.0.1:8080: "),
             "{msg}"
         );
-        assert!(msg.contains(&format!("bind {addr}")), "{msg}");
+        assert!(msg.contains("--port <BASE>"), "{msg}");
+        assert!(msg.contains("`rest_port`"), "{msg}");
+        assert!(!msg.contains("--auto-port"), "{msg}");
+        if cfg!(windows) {
+            assert!(msg.contains("excludedportrange"), "{msg}");
+        } else {
+            let low: SocketAddr = "127.0.0.1:80".parse().unwrap();
+            let msg = bind_error_message("native REST", low, &os);
+            assert!(msg.contains("below 1024"), "{msg}");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn wsaeacces_is_classified_as_a_refused_port() {
+        // WSAEACCES, the code in both field reports.
+        let os = Error::from_raw_os_error(10013);
+        let addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
+        let msg = bind_error_message("native REST", addr, &os);
+        assert!(msg.contains("excludedportrange"), "{msg}");
+        assert!(msg.contains("os error 10013"), "{msg}");
+    }
+
+    /// Anything else keeps the plain `{name}: bind {addr}: {reason}`.
+    #[test]
+    fn other_bind_errors_are_not_given_a_port_hint() {
+        let os = Error::from(ErrorKind::AddrNotAvailable);
+        let addr: SocketAddr = "10.255.255.1:9200".parse().unwrap();
+        let msg = bind_error_message("ES-compat", addr, &os);
+        assert_eq!(msg, format!("ES-compat: bind {addr}: {os}"));
     }
 }
 
@@ -1458,7 +1558,7 @@ fn bind_listener_candidate(
                 return Ok((listener, candidate));
             }
             Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {}
-            Err(e) => return Err(anyhow::anyhow!("{name}: bind {addr}: {e}")),
+            Err(e) => return Err(anyhow::anyhow!("{}", bind_error_message(name, addr, &e))),
         }
     }
 
@@ -2297,9 +2397,140 @@ fn build_runtime(worker_threads: usize) -> Result<tokio::runtime::Runtime> {
         .context("build tokio runtime")
 }
 
+/// #1840: a neural startup whose Hub cannot be reached fails once, here,
+/// before any listener exists. This lives in `xerj-server` because that
+/// crate's default features include `neural`, which is what
+/// `cargo test --workspace` actually runs. `xerj-ai`'s own tests do not
+/// enable the feature unless asked.
+#[cfg(all(test, feature = "neural"))]
+mod neural_startup_tests {
+    use xerj_ai::neural::{startup_failure_message, NeuralConfig};
+    use xerj_ai::Embedder;
+
+    /// Closed port on loopback. Connection refused is local and immediate;
+    /// nothing is sent off the machine.
+    const UNREACHABLE_HUB: &str = "http://127.0.0.1:1";
+
+    #[test]
+    fn unreachable_hub_refuses_once_and_does_not_install_lexical() {
+        let cache = tempfile::tempdir().unwrap();
+        let cfg = NeuralConfig {
+            model_id: "sentence-transformers/all-MiniLM-L6-v2".into(),
+            cache_dir: Some(cache.path().to_path_buf()),
+            local_dir: None,
+            hub_endpoint: Some(UNREACHABLE_HUB.into()),
+        };
+        // `NeuralEmbedder` is not `Debug`, so `expect_err` cannot name the Ok side.
+        let error = match Embedder::preload_neural(&cfg) {
+            Ok(_) => panic!("a closed hub must not load a model"),
+            Err(error) => error,
+        };
+        let message = startup_failure_message(&cfg.model_id, &error);
+        assert!(
+            message.contains("127.0.0.1") || message.contains("Connection refused"),
+            "the cause must be the closed local hub, not a real download: {message}"
+        );
+        assert!(
+            message.contains("xerj --embed-mode lexical"),
+            "the error must give the lexical command: {message}"
+        );
+        assert!(
+            message.contains("embedding.local_model_dir"),
+            "the error must name the offline model directory: {message}"
+        );
+        assert!(
+            message.contains("HF_ENDPOINT"),
+            "the error must name the mirror variable: {message}"
+        );
+        assert!(
+            message.contains("Refusing to start"),
+            "the error must say the process will not start: {message}"
+        );
+        assert!(
+            !message
+                .to_ascii_lowercase()
+                .contains("falling back to lexical"),
+            "must not describe a lexical swap: {message}"
+        );
+        // The shared cell stays empty, so a later embed cannot pretend the
+        // model loaded. Preload's return type is the neural model itself:
+        // failure cannot hand back a lexical embedder.
+        assert!(
+            Embedder::preload_neural(&cfg).is_err(),
+            "a second attempt must still fail rather than reuse a lexical stand-in"
+        );
+    }
+
+    #[test]
+    fn missing_local_model_refuses_with_the_same_startup_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = xerj_common::config::EmbeddingConfig {
+            mode: "neural".into(),
+            local_model_dir: dir.path().to_string_lossy().into_owned(),
+            ..Default::default()
+        };
+        let error = xerj_engine::index::ensure_neural_ready(&cfg)
+            .expect_err("an empty local model directory must refuse startup");
+        let message = error.to_string();
+        assert!(
+            message.contains("embedding.mode=neural"),
+            "must name the setting: {message}"
+        );
+        assert!(
+            message.contains("xerj --embed-mode lexical"),
+            "must give the lexical command: {message}"
+        );
+        assert!(
+            message.contains("model.safetensors") || message.contains("missing"),
+            "must name the missing local asset: {message}"
+        );
+        assert!(
+            !message.contains("127.0.0.1"),
+            "a local directory must not contact the hub: {message}"
+        );
+    }
+}
+
 #[cfg(test)]
 mod help_text_tests {
     use super::{auth_disabled_line, help_text};
+
+    /// #1840: `--embed-mode neural` must say the model loads at startup and
+    /// that a failed download refuses to start, with the lexical command.
+    #[test]
+    fn neural_help_says_a_failed_download_refuses_to_start() {
+        let help = help_text(true);
+        let neural = help
+            .lines()
+            .position(|line| line.contains("neural   built-in BERT"))
+            .expect("neural mode must be documented");
+        let window: String = help
+            .lines()
+            .skip(neural)
+            .take(12)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            window.contains("loads at startup"),
+            "neural help must say the model loads at startup:\n{window}"
+        );
+        assert!(
+            window.contains("refuses to start"),
+            "neural help must say a failed load refuses to start:\n{window}"
+        );
+        assert!(
+            window.contains("xerj --embed-mode lexical"),
+            "neural help must give the lexical command:\n{window}"
+        );
+        assert!(
+            window.contains("embedding.local_model_dir"),
+            "neural help must name the offline model directory:\n{window}"
+        );
+        assert!(
+            window.contains("HF_ENDPOINT"),
+            "neural help must name the Hub mirror variable:\n{window}"
+        );
+    }
 
     /// A loopback `--insecure` boot says nothing off this host can connect,
     /// then used to say anyone on the network can write. Those two lines
@@ -3037,6 +3268,35 @@ async fn async_main() -> Result<()> {
             cfg.server.es_compat_port,
             cfg.server.grpc_port,
         );
+    }
+
+    // 3d. Explicit mode=neural loads the model before the data directory, the
+    //     admin key, or any listener (#1840). A blocked Hub used to boot a
+    //     node that then failed every ingest. Explicit proxy already refuses
+    //     to start rather than substitute lexical vectors (#1189); neural does
+    //     the same, because those vectors are not comparable. A slim build
+    //     without the neural feature keeps its documented lexical fallback
+    //     (identity reports lexical) — there is no model to load.
+    if cfg.embedding.mode.trim().eq_ignore_ascii_case("neural") {
+        #[cfg(feature = "neural")]
+        {
+            let embedding = cfg.embedding.clone();
+            info!(
+                model = %embedding.neural_model,
+                "embedding.mode=neural: loading the model before opening the data directory"
+            );
+            tokio::task::spawn_blocking(move || {
+                xerj_engine::index::ensure_neural_ready(&embedding)
+            })
+            .await
+            .context("neural embedder load task panicked")??;
+            info!("embedding.mode=neural: model loaded");
+        }
+        #[cfg(not(feature = "neural"))]
+        {
+            // Slim binary. `make_neural_embedder` warns and uses lexical when
+            // an index actually embeds. Do not refuse to start.
+        }
     }
 
     // 4. Data directory
