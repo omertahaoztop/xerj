@@ -47,8 +47,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # <lastmod> comes from `git log -1 --format=%cs -- <file>`; a shallow
-          # clone would silently degrade every date to the filesystem mtime.
+          # <lastmod> comes from `git log --date=format-local` with TZ=UTC
+          # (`urlmap.DateSource`); a shallow clone would make every file look
+          # added at the boundary and silently degrade every date to mtime.
           fetch-depth: 0
 
       - uses: actions/setup-python@v5
